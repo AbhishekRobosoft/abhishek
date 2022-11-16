@@ -4,7 +4,9 @@ import lombok.Data;
 @Data
 public class AmountDetails
 {
-    private int AmountPaid;
-    private int tax;
+    private float totalAmount;
+    private float AmountPaid;
+    private float taxAmount;
+    private float discount;
     private String paymentType;
 }

@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 public class UserController
@@ -122,9 +123,9 @@ public class UserController
     }
 
     @GetMapping("/getOrderDetails")
-    public OrderDetails getOrderDetails(@RequestBody com.robosoft.lorem.model.User user)
+    public OrderDetails getOrderDetails(@RequestBody Orders orders)
     {
-        return userServiceImpl.getOrderDetails(user);
+        return userServiceImpl.getOrderDetails(orders);
     }
 
     @PostMapping("/addCard")
@@ -198,6 +199,28 @@ public class UserController
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Something went wrong");
         }
     }
+
+    @PutMapping("/makePayment")
+    public String makePayment(@RequestBody Payment payment)
+    {
+        return userServiceImpl.makePayment(payment);
+    }
+
+    @PutMapping("/giveFeedback")
+    public ResponseEntity<String> giveFeedback(@RequestBody FeedBack feedBack)
+    {
+      try
+      {
+          this.userServiceImpl.giveFeedback(feedBack);
+          return ResponseEntity.status(HttpStatus.OK).build();
+      }
+      catch (Exception e)
+      {
+          return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+      }
+    }
+
+
 
 
 }

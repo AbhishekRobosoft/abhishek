@@ -1,10 +1,15 @@
 package com.robosoft.lorem.utility;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
 import java.io.Serializable;
 import java.util.Date;
 import java.util.HashMap;
@@ -43,9 +48,16 @@ public class JWTUtility implements Serializable
 
 
     //for retrieving any information from token we will need the secret key
-    private Claims getAllClaimsFromToken(String token)
+    private Claims getAllClaimsFromToken(String token) throws ExpiredJwtException
     {
-        return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+        try
+        {
+            return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+        }
+        catch (ExpiredJwtException e)
+        {
+            return Jwts.claims();
+        }
     }
 
 
@@ -82,4 +94,11 @@ public class JWTUtility implements Serializable
         final String username = getUsernameFromToken(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
+
+    public String checkToken()
+    {
+        return "Token Expired";
+    }
+
+
 }
