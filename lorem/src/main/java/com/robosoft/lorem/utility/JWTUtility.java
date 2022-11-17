@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.io.Serializable;
+import java.nio.file.AccessDeniedException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -76,7 +77,6 @@ public class JWTUtility implements Serializable
         return doGenerateToken(claims, userDetails.getUsername());
     }
 
-
     //while creating the token -
     //1. Define  claims of the token, like Issuer, Expiration, Subject, and the ID
     //2. Sign the JWT using the HS512 algorithm and secret key.
@@ -94,11 +94,5 @@ public class JWTUtility implements Serializable
         final String username = getUsernameFromToken(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
-
-    public String checkToken()
-    {
-        return "Token Expired";
-    }
-
 
 }

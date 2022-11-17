@@ -22,4 +22,5 @@ public class ReviewInfo
     private int averageRating;
     private List<MultipartFile> multipartFileList;
     private List<String> photoLinks;
+    private int orderId;
 }

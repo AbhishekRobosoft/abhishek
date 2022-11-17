@@ -14,7 +14,6 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +22,6 @@ import java.util.Map;
 @RestController
 public class UserController
 {
-
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -64,9 +62,24 @@ public class UserController
     }
 
     @PutMapping("/likeBrand")
-    public String addToFav(@RequestBody FavTable favTable)
+    public ResponseEntity<String> addToFav(@RequestBody FavTable favTable)
     {
-        return userServiceImpl.addToFavourite(favTable);
+        try
+        {
+            boolean check=userServiceImpl.addToFavourite(favTable);
+            if(check==true)
+            {
+                return new ResponseEntity("Added to favorites",HttpStatus.OK);
+            }
+            else
+            {
+                return new ResponseEntity("Failed to add favorites",HttpStatus.BAD_GATEWAY);
+            }
+        }
+        catch (Exception e)
+        {
+            return new ResponseEntity("Failed to add favorites",HttpStatus.BAD_GATEWAY);
+        }
     }
 
     @GetMapping("/viewPopularBrands")
@@ -110,20 +123,27 @@ public class UserController
     {
         try
         {
-            List<String> photoLinks=new ArrayList<String>();
-            for(int i=0;i<reviewInfo.getMultipartFileList().size();i++)
+            try
             {
-                Map uploadResult = cloudinary.upload(reviewInfo.getMultipartFileList().get(i).getBytes(), ObjectUtils.asMap("resourcetype", "auto"));
-                photoLinks.add(uploadResult.get("url").toString());
+                List<String> photoLinks = new ArrayList<String>();
+                for (int i = 0; i < reviewInfo.getMultipartFileList().size(); i++)
+                {
+                    Map uploadResult = cloudinary.upload(reviewInfo.getMultipartFileList().get(i).getBytes(), ObjectUtils.asMap("resourcetype", "auto"));
+                    photoLinks.add(uploadResult.get("url").toString());
+                }
+                reviewInfo.setPhotoLinks(photoLinks);
+                userServiceImpl.addReview(reviewInfo);
             }
-            reviewInfo.setPhotoLinks(photoLinks);
-            userServiceImpl.addReview(reviewInfo);
+            catch (Exception e)
+            {
+                userServiceImpl.addReview(reviewInfo);
+            }
+            return new ResponseEntity(HttpStatus.OK);
         }
-        catch (IOException e)
+        catch (Exception e)
         {
-            e.printStackTrace();
+            return new ResponseEntity("Failed to add review",HttpStatus.BAD_GATEWAY);
         }
-        return new ResponseEntity(HttpStatus.OK);
     }
 
     @GetMapping("/getReviews")
@@ -151,9 +171,25 @@ public class UserController
     }
 
     @PostMapping("/addCard")
-    public String addCard(@RequestBody Card card)
+    public ResponseEntity<String> addCard(@RequestBody Card card)
     {
-        return userServiceImpl.addCard(card);
+        try
+        {
+            boolean message=userServiceImpl.addCard(card);
+            if(message==true)
+            {
+                return new ResponseEntity("Card added successfully", HttpStatus.OK);
+            }
+            else
+            {
+                return new ResponseEntity("Failed to add card", HttpStatus.BAD_GATEWAY);
+            }
+        }
+        catch (Exception e)
+        {
+            return new ResponseEntity("Failed to add card", HttpStatus.BAD_GATEWAY);
+        }
+
     }
 
     @GetMapping("/viewCards")
@@ -161,12 +197,12 @@ public class UserController
     {
         try
         {
-            List<Card> viewCards=userServiceImpl.viewCards(user);
-            if(viewCards.size()==0)
+            Map<Integer, List<Card>> cardLists=userServiceImpl.viewCards(user);
+            if(cardLists.size()==0)
             {
                 return new ResponseEntity<>("No Cards Saved Please Add Some Cards",HttpStatus.FORBIDDEN);
             }
-           return new ResponseEntity<>(viewCards,HttpStatus.ACCEPTED);
+           return new ResponseEntity<>(cardLists,HttpStatus.ACCEPTED);
         }
         catch (Exception e)
         {
@@ -223,9 +259,18 @@ public class UserController
     }
 
     @PutMapping("/makePayment")
-    public String makePayment(@RequestBody Payment payment)
+    public ResponseEntity<String> makePayment(@RequestBody Payment payment)
     {
-        return userServiceImpl.makePayment(payment);
+        try
+        {
+            String message = userServiceImpl.makePayment(payment);
+            return new ResponseEntity(message, HttpStatus.OK);
+        }
+        catch (Exception e)
+        {
+            String message=userServiceImpl.makePayment(payment);
+            return new ResponseEntity(message,HttpStatus.BAD_GATEWAY);
+        }
     }
 
     @PutMapping("/giveFeedback")
@@ -233,16 +278,19 @@ public class UserController
     {
       try
       {
-          this.userServiceImpl.giveFeedback(feedBack);
-          return ResponseEntity.status(HttpStatus.OK).build();
+          if(userServiceImpl.giveFeedback(feedBack)==true)
+          {
+              return new ResponseEntity("Thank you for your feedback", HttpStatus.OK);
+          }
+          else
+          {
+              return new ResponseEntity("Something went wrong",HttpStatus.BAD_GATEWAY);
+          }
       }
       catch (Exception e)
       {
-          return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+          return new ResponseEntity("Something went wrong",HttpStatus.BAD_GATEWAY);
       }
+
     }
-
-
-
-
 }

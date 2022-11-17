@@ -11,9 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import java.io.File;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -22,9 +20,6 @@ public class UserService implements UserDetailsService
 {
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    AdminService adminService;
 
     @Autowired
     BCryptPasswordEncoder passwordEncoder;
@@ -54,18 +49,18 @@ public class UserService implements UserDetailsService
         return username;
     }
 
-    public String addToFavourite(FavTable favTable)
+    public boolean addToFavourite(FavTable favTable)
     {
         try
         {
             String email = getUserNameFromToken();
             int id = jdbcTemplate.queryForObject("select userId from user where emailId=?", Integer.class, new Object[]{email});
             jdbcTemplate.update("insert into favTable values(?,?)", id, favTable.getBrandId());
-            return "added to favourites";
+            return true;
         }
         catch (Exception e)
         {
-            return "Something Went Wrong";
+            return false;
         }
     }
 
@@ -75,7 +70,7 @@ public class UserService implements UserDetailsService
         Map<Integer, List<BrandList>> popular = new HashMap<>();
         try
         {
-            int brandNo = jdbcTemplate.queryForObject("select brandId from favTable group by brandId limit ?,?", Integer.class, new Object[]{lowerLimit, upperLimit});
+            int brandNo = jdbcTemplate.queryForObject("select brandId from favTable group by brandId order by count(brandId) desc limit ?,?", Integer.class, new Object[]{lowerLimit, upperLimit});
             List<BrandList> brands = jdbcTemplate.query("select brandName, description, logo, profilePic, brandOrigin from brand where brandId=?", new BeanPropertyRowMapper<>(BrandList.class), brandNo);
             lowerLimit = lowerLimit + 1;
             popular.put(brands.size(), brands);
@@ -93,18 +88,25 @@ public class UserService implements UserDetailsService
 
     public Map<Integer, List<BrandList>> viewAllBrands()
     {
-        Map<Integer, List<BrandList>> theThings = new HashMap<>();
-        List<BrandList> brandLists = jdbcTemplate.query("select brandName, description, logo, profilePic, brandOrigin from brand", new BeanPropertyRowMapper<>(BrandList.class));
-        theThings.put(brandLists.size(), brandLists);
-        return theThings;
+        try
+        {
+            Map<Integer, List<BrandList>> theThings = new HashMap<>();
+            List<BrandList> brandLists = jdbcTemplate.query("select brandName, description, logo, profilePic, brandOrigin from brand", new BeanPropertyRowMapper<>(BrandList.class));
+            theThings.put(brandLists.size(), brandLists);
+            return theThings;
+        }
+        catch (Exception e)
+        {
+           return null;
+        }
     }
 
     public String addReview(ReviewInfo reviewInfo)
     {
+        String email = getUserNameFromToken();
+        int id = jdbcTemplate.queryForObject("select userId from user where emailId=?", Integer.class, new Object[]{email});
         try
         {
-            String email = getUserNameFromToken();
-            int id = jdbcTemplate.queryForObject("select userId from user where emailId=?", Integer.class, new Object[]{email});
             int userId = jdbcTemplate.queryForObject("select userId from orders where userId=? group by userId", Integer.class, new Object[]{id});
             int restaurantId = jdbcTemplate.queryForObject("select restaurantId from orders where userId=? group by restaurantId", Integer.class, new Object[]{userId});
             if (restaurantId == reviewInfo.getRestaurantId() || id==userId)
@@ -139,8 +141,16 @@ public class UserService implements UserDetailsService
         }
         catch (Exception e)
         {
-            return "Failed to add review";
+            try
+            {
+                jdbcTemplate.update("insert into review(userId, description, serviceRating, orderId, localDate) values(?,?,?,?,?)", id, reviewInfo.getDescription(), reviewInfo.getServiceRating(), reviewInfo.getOrderId(), LocalDate.now());
+            }
+            catch (Exception exception)
+            {
+                jdbcTemplate.update("insert into review (userId, serviceRating, orderId, LocalDate) values(?,?,?,?)", id, reviewInfo.getServiceRating(), reviewInfo.getOrderId(), LocalDate.now());
+            }
         }
+        return "Review added";
 
     }
 
@@ -200,22 +210,24 @@ public class UserService implements UserDetailsService
 
     public OrderDetails getOrderDetails(Orders orders)
     {
-        String query = "select orders.orderId, orders.cartId, cart.scheduledDate, cart.scheduledTime, cart.restaurantId, restaurant.restaurantName, address.addressDesc from cart inner join orders on orders.cartId=cart.cartId inner join restaurant on orders.restaurantId=restaurant.restaurantId inner join address on orders.addressId=address.addressId where orders.userId=? and orders.orderId=?";
-        return jdbcTemplate.queryForObject(query, (rs, rowNum) ->
-        {
-            OrderDetails orderDetails = new OrderDetails();
-            orderDetails.setOrderId(rs.getInt("orders.orderId"));
-            orderDetails.setCartId(rs.getInt("orders.cartId"));
-            orderDetails.setScheduleDate(rs.getString("cart.scheduledDate"));
-            orderDetails.setScheduleTime(rs.getString("cart.scheduledTime"));
-            orderDetails.setRestaurantId(rs.getInt("cart.restaurantId"));
-            orderDetails.setRestaurantName(rs.getString("restaurant.restaurantName"));
-            orderDetails.setDeliveryAddress(rs.getString("address.addressDesc"));
-            orderDetails.setDishInfoList(giveDishDetails(rs.getInt("cart.restaurantId"), rs.getInt("orders.cartId")));
-            orderDetails.setAmountDetails(provideAmountDetails(rs.getInt("orders.orderId")));
-            return orderDetails;
-        }, orders.getUserId(), orders.getOrderId());
-    }
+
+            String query = "select orders.orderId, orders.cartId, cart.scheduledDate, cart.scheduledTime, cart.restaurantId, restaurant.restaurantName, address.addressDesc from cart inner join orders on orders.cartId=cart.cartId inner join restaurant on orders.restaurantId=restaurant.restaurantId inner join address on orders.addressId=address.addressId where orders.userId=? and orders.orderId=?";
+            return jdbcTemplate.queryForObject(query, (rs, rowNum) ->
+            {
+                OrderDetails orderDetails = new OrderDetails();
+                orderDetails.setOrderId(rs.getInt("orders.orderId"));
+                orderDetails.setCartId(rs.getInt("orders.cartId"));
+                orderDetails.setScheduleDate(rs.getString("cart.scheduledDate"));
+                orderDetails.setScheduleTime(rs.getString("cart.scheduledTime"));
+                orderDetails.setRestaurantId(rs.getInt("cart.restaurantId"));
+                orderDetails.setRestaurantName(rs.getString("restaurant.restaurantName"));
+                orderDetails.setDeliveryAddress(rs.getString("address.addressDesc"));
+                orderDetails.setDishInfoList(giveDishDetails(rs.getInt("cart.restaurantId"), rs.getInt("orders.cartId")));
+                orderDetails.setAmountDetails(provideAmountDetails(rs.getInt("orders.orderId")));
+                return orderDetails;
+            }, orders.getUserId(), orders.getOrderId());
+        }
+
 
     public List<DishInfo> giveDishDetails(int restaurantId, int cartId)
     {
@@ -288,24 +300,34 @@ public class UserService implements UserDetailsService
         }
     }
 
-    public String addCard(Card card)
+    public boolean addCard(Card card)
     {
         try
         {
             String hash=passwordEncoder.encode(card.getCvv());
             jdbcTemplate.update("insert into card (cardNo, cardName, expiryDate, cvv, userId) values (?,?,?,?,?)",card.getCardNo(),card.getCardName(),card.getExpiryDate(),hash,card.getUserId());
-            return "Card Added Successfully";
+            return true;
         }
         catch (Exception e)
         {
-            return "Failed to Add Card";
+            return false;
         }
 
     }
 
-    public List <Card> viewCards(com.robosoft.lorem.model.User user)
+    public Map<Integer,List<Card>> viewCards(com.robosoft.lorem.model.User user)
     {
-        return jdbcTemplate.query("select cardNo, cardName, expiryDate from card where userId=?", new BeanPropertyRowMapper<>(Card.class),user.getUserId());
+        try
+        {
+            Map<Integer, List<Card>> cardInfo = new HashMap<>();
+            List<Card> cards = jdbcTemplate.query("select cardNo, cardName, expiryDate from card where userId=?", new BeanPropertyRowMapper<>(Card.class), user.getUserId());
+            cardInfo.put(cards.size(),cards);
+            return cardInfo;
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
     }
 
     public boolean editCard(Card card)
@@ -341,20 +363,17 @@ public class UserService implements UserDetailsService
         return card.getCardNo()+"selected as primary";
     }
 
-    public String deleteCard(Card card)
+    public boolean deleteCard(Card card)
     {
-        jdbcTemplate.update("update card set cardDeleted=1 where cardNo=? and userId=?",card.getCardNo(),card.getUserId());
-        return card.getCardNo()+" Removed successfully";
-    }
-
-    public List<Card> makeOrder(Orders order)
-    {
-        String email = getUserNameFromToken();
-        int id = jdbcTemplate.queryForObject("select userId from user where emailId=?", Integer.class, new Object[]{email});
-        jdbcTemplate.update("insert into orders (orderType, addressId, contactName, contactNumber, deliveryInstructions, cartId, userId) values(?,?,?,?,?,?,?)",order.getOrderType(),order.getAddressId(),order.getContactName(),order.getContactNo(),order.getDeliveryInstructions(),order.getCartId(),id);
-        int restaurantId=jdbcTemplate.queryForObject("select restaurantId from cart where cartId=?", Integer.class, new Object[]{order.getCartId()});
-        jdbcTemplate.update("update order set restaurantId=? where cartId=?",restaurantId,order.getOrderId());
-        return  jdbcTemplate.query("select cardNo, cardName, expiryDate from card where userId=?", new BeanPropertyRowMapper<>(Card.class),order.getUserId());
+        try
+        {
+            jdbcTemplate.update("update card set cardDeleted=1 where cardNo=? and userId=?", card.getCardNo(), card.getUserId());
+            return true;
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
     }
 
     public String  makePayment(Payment payment)
@@ -364,12 +383,10 @@ public class UserService implements UserDetailsService
         try
         {
             String cvv = jdbcTemplate.queryForObject("select cvv from card where cardNo=?", String.class, new Object[]{payment.getCardNo()});
-            System.out.println(cvv);
-            System.out.println(payment.getCvv());
             if (passwordEncoder.matches(payment.getCvv(), cvv))
             {
                 jdbcTemplate.update("insert into payment (userId, orderId, amount, promoCode, cardNo, taxAmount, discount, grandTotal) values(?,?,?,?,?,?,?,?)", id, payment.getOrderId(), payment.getAmount(), payment.getPromoCode(), payment.getCardNo(), payment.getTaxAmount(), payment.getDiscount(), payment.getGrandTotal());
-                jdbcTemplate.update("update payment set paymentStatus=? where orderId=?"," Paid",payment.getOrderId());
+                jdbcTemplate.update("update payment set paymentStatus=? where orderId=?","Paid",payment.getOrderId());
                 payment.setOrderStatus("orderPlaced");
                 jdbcTemplate.update("update orders set orderStatus=? where orderId=?", payment.getOrderStatus(), payment.getOrderId());
                 int cartId=jdbcTemplate.queryForObject("select cartId from orders where orderId=?",Integer.class, new Object[]{payment.getOrderId()});
@@ -383,22 +400,36 @@ public class UserService implements UserDetailsService
         }
         catch (Exception e)
         {
-            jdbcTemplate.update("insert into payment (userId, orderId, amount, promoCode, taxAmount, discount, grandTotal) values(?,?,?,?,?,?,?)", id, payment.getOrderId(), payment.getAmount(), payment.getPromoCode(), payment.getTaxAmount(), payment.getDiscount(), payment.getGrandTotal());
-            jdbcTemplate.update("update payment set paymentStatus=? where orderId=?","Not Paid",payment.getOrderId());
-            payment.setOrderStatus("orderPlaced");
-            jdbcTemplate.update("update orders set orderStatus=? where orderId=?", payment.getOrderStatus(), payment.getOrderId());
-            int cartId=jdbcTemplate.queryForObject("select cartId from orders where orderId=?",Integer.class, new Object[]{payment.getOrderId()});
-            jdbcTemplate.update("update cart set cartDeleted=1 where cartId=?",cartId);
-            return payment.getOrderStatus();
+            if(payment.getCardNo()==null)
+            {
+                jdbcTemplate.update("insert into payment (userId, orderId, amount, promoCode, taxAmount, discount, grandTotal) values(?,?,?,?,?,?,?)", id, payment.getOrderId(), payment.getAmount(), payment.getPromoCode(), payment.getTaxAmount(), payment.getDiscount(), payment.getGrandTotal());
+                jdbcTemplate.update("update payment set paymentStatus=? where orderId=?", "Not Paid", payment.getOrderId());
+                payment.setOrderStatus("orderPlaced");
+                jdbcTemplate.update("update orders set orderStatus=? where orderId=?", payment.getOrderStatus(), payment.getOrderId());
+                int cartId = jdbcTemplate.queryForObject("select cartId from orders where orderId=?", Integer.class, new Object[]{payment.getOrderId()});
+                jdbcTemplate.update("update cart set cartDeleted=1 where cartId=?", cartId);
+                return payment.getOrderStatus();
+            }
+            else
+            {
+                return "payment failed";
+            }
         }
     }
 
-    public String giveFeedback(FeedBack feedBack)
+    public boolean giveFeedback(FeedBack feedBack)
     {
-        String email = getUserNameFromToken();
-        int id = jdbcTemplate.queryForObject("select userId from user where emailId=?", Integer.class, new Object[]{email});
-        jdbcTemplate.update("insert into feedback (userId, role, feedBackDescription, userName, entityName, contactEmail, contactNo, city, area, category) values (?,?,?,?,?,?,?,?,?,?)",id,feedBack.getRole(),feedBack.getMessage(),feedBack.getName(),feedBack.getEntityName(),feedBack.getContactEmailId(),feedBack.getContactMobileNumber(),feedBack.getEntityCity(),feedBack.getEntityArea(),feedBack.getCategoryType());
-        return "Thank You for your feedback";
+        try
+        {
+            String email = getUserNameFromToken();
+            int id = jdbcTemplate.queryForObject("select userId from user where emailId=?", Integer.class, new Object[]{email});
+            jdbcTemplate.update("insert into feedback (userId, role, feedBackDescription, userName, entityName, contactEmail, contactNo, city, area, category) values (?,?,?,?,?,?,?,?,?,?)", id, feedBack.getRole(), feedBack.getMessage(), feedBack.getName(), feedBack.getEntityName(), feedBack.getContactEmailId(), feedBack.getContactMobileNumber(), feedBack.getEntityCity(), feedBack.getEntityArea(), feedBack.getCategoryType());
+            return true;
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
     }
 
 

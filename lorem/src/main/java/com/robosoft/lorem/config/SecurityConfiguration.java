@@ -52,4 +52,5 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter
         String generatedString = new String(array, Charset.forName("UTF-8"));
         System.out.println(generatedString);
     }
+
 }
