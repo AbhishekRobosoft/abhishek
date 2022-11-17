@@ -21,4 +21,5 @@ public class ReviewInfo
     private int serviceRating;
     private int averageRating;
     private List<MultipartFile> multipartFileList;
+    private List<String> photoLinks;
 }

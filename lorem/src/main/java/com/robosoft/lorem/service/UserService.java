@@ -116,18 +116,14 @@ public class UserService implements UserDetailsService
                 jdbcTemplate.update("update review set averageRating=? where reviewId=?", (reviewInfo1.getFoodRating() + reviewInfo1.getServiceRating()) / 2, reviewId);
                 try
                 {
-                    if (reviewInfo.getMultipartFileList() == null)
+                    if (reviewInfo.getPhotoLinks()!=null)
                     {
-                        for (int i = 0; i < reviewInfo.getMultipartFileList().size(); i++)
+                        for(int i=0;i<reviewInfo.getPhotoLinks().size();i++)
                         {
-                            String fileName = reviewInfo.getMultipartFileList().get(i).getOriginalFilename();
-                            fileName = UUID.randomUUID().toString().concat(adminService.getExtension(fileName));
-                            File file = adminService.convertToFile(reviewInfo.getMultipartFileList().get(i), fileName);
-                            String TEMP_URL = adminService.uploadFile(file, fileName);
-                            file.delete();
-                            jdbcTemplate.update("insert into photo (photoPic, reviewId) values(?,?)", TEMP_URL, reviewId);
+                            jdbcTemplate.update("insert into photo (photoPic, reviewId) values(?,?)",reviewInfo.getPhotoLinks().get(i),reviewId);
                         }
                     }
+
                 }
                 catch (Exception e)
                 {

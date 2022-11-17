@@ -7,6 +7,6 @@ import org.springframework.web.multipart.MultipartFile;
 @AllArgsConstructor
 public class Photo
 {
-    private MultipartFile photo;
+    private String photo;
     private int reviewId;
 }

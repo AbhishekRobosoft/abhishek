@@ -1,7 +1,9 @@
 package com.robosoft.lorem.controller;
+import com.cloudinary.utils.ObjectUtils;
 import com.robosoft.lorem.model.*;
 import com.robosoft.lorem.response.BrandList;
 import com.robosoft.lorem.response.OrderDetails;
+import com.robosoft.lorem.service.CloudinaryConfig;
 import com.robosoft.lorem.service.UserService;
 import com.robosoft.lorem.utility.JWTUtility;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,9 +14,11 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+
 
 @RestController
 public class UserController
@@ -29,6 +33,9 @@ public class UserController
 
     @Autowired
     private JWTUtility jwtUtility;
+
+    @Autowired
+    CloudinaryConfig cloudinary;
 
 
     @PostMapping("/authenticate")
@@ -99,9 +106,24 @@ public class UserController
     }
 
     @PostMapping("/review")
-    public String addReview(@ModelAttribute ReviewInfo reviewInfo)
+    public ResponseEntity<String> addReview(@ModelAttribute ReviewInfo reviewInfo)
     {
-        return userServiceImpl.addReview(reviewInfo);
+        try
+        {
+            List<String> photoLinks=new ArrayList<String>();
+            for(int i=0;i<reviewInfo.getMultipartFileList().size();i++)
+            {
+                Map uploadResult = cloudinary.upload(reviewInfo.getMultipartFileList().get(i).getBytes(), ObjectUtils.asMap("resourcetype", "auto"));
+                photoLinks.add(uploadResult.get("url").toString());
+            }
+            reviewInfo.setPhotoLinks(photoLinks);
+            userServiceImpl.addReview(reviewInfo);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        return new ResponseEntity(HttpStatus.OK);
     }
 
     @GetMapping("/getReviews")

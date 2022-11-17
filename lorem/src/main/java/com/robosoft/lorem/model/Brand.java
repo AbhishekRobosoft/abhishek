@@ -21,4 +21,6 @@ public class Brand
     private MultipartFile logo;
     private MultipartFile profilePic;
     private String brandOrigin;
+    private String profileLink;
+    private String logoLink;
 }
